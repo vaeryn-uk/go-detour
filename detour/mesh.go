@@ -97,11 +97,13 @@ func Decode(r io.Reader) (*NavMesh, error) {
 		var (
 			tileHdr navMeshTileHeader
 			err     error
+			tileSize int64		// UE4: In UE4, this takes 8 bytes (although looks to only be a 32 bit int)
 		)
 		err = binary.Read(r, binary.LittleEndian, &tileHdr)
 		if err != nil {
 			return nil, err
 		}
+		tileHdr.DataSize = int32(tileSize)		// Convert it to 4.
 
 		if tileHdr.TileRef == 0 || tileHdr.DataSize == 0 {
 			break
@@ -634,7 +636,8 @@ func (m *NavMesh) encodePolyID(salt, it, ip uint32) PolyRef {
 }
 
 // PolyRef is a polygon reference.
-type PolyRef uint32
+// UE4: this is 8 bytes.
+type PolyRef uint64
 
 // Link defines a Link between polygons.
 //

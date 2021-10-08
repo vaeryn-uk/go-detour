@@ -7,7 +7,8 @@ import (
 )
 
 // TileRef is a reference to a tile of the navigation mesh.
-type TileRef uint32
+// UE4: By default the engine represents these as an 8 byte int.
+type TileRef uint64
 
 type navMeshTileHeader struct {
 	TileRef  TileRef

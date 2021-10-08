@@ -107,8 +107,16 @@ type MeshHeader struct {
 	BvQuantFactor   float32    // The bounding volume quantization factor.
 }
 
+// UE4: By default, UE4 stores additional data in each mesh header. These are:
+// int offMeshSegConCount;
+// int offMeshSegPolyBase;
+// int offMeshSegVertBase;
+// int clusterCount;
+// Each is int32, so needs to ignore this many bytes when reading files.
+var skipHeaderBytes = 4 * 4
+
 func (s *MeshHeader) size() int {
-	return 100
+	return 100 + skipHeaderBytes	// UE4: The additional fields increase the size of our header.
 }
 
 func (s *MeshHeader) serialize(dst []byte) {
@@ -173,14 +181,18 @@ func (s *MeshHeader) unserialize(src []byte) {
 	s.BvNodeCount = int32(little.Uint32(src[off+48:]))
 	s.OffMeshConCount = int32(little.Uint32(src[off+52:]))
 	s.OffMeshBase = int32(little.Uint32(src[off+56:]))
-	s.WalkableHeight = math.Float32frombits(little.Uint32(src[off+60:]))
-	s.WalkableRadius = math.Float32frombits(little.Uint32(src[off+64:]))
-	s.WalkableClimb = math.Float32frombits(little.Uint32(src[off+68:]))
-	s.BMin[0] = math.Float32frombits(little.Uint32(src[off+72:]))
-	s.BMin[1] = math.Float32frombits(little.Uint32(src[off+76:]))
-	s.BMin[2] = math.Float32frombits(little.Uint32(src[off+80:]))
-	s.BMax[0] = math.Float32frombits(little.Uint32(src[off+84:]))
-	s.BMax[1] = math.Float32frombits(little.Uint32(src[off+88:]))
-	s.BMax[2] = math.Float32frombits(little.Uint32(src[off+92:]))
-	s.BvQuantFactor = math.Float32frombits(little.Uint32(src[off+96:]))
+
+	// UE4: this is where the additional mesh headers appear. Start skipping now.
+	skip := skipHeaderBytes
+
+	s.WalkableHeight = math.Float32frombits(little.Uint32(src[off+60+skip:]))
+	s.WalkableRadius = math.Float32frombits(little.Uint32(src[off+64+skip:]))
+	s.WalkableClimb = math.Float32frombits(little.Uint32(src[off+68+skip:]))
+	s.BMin[0] = math.Float32frombits(little.Uint32(src[off+72+skip:]))
+	s.BMin[1] = math.Float32frombits(little.Uint32(src[off+76+skip:]))
+	s.BMin[2] = math.Float32frombits(little.Uint32(src[off+80+skip:]))
+	s.BMax[0] = math.Float32frombits(little.Uint32(src[off+84+skip:]))
+	s.BMax[1] = math.Float32frombits(little.Uint32(src[off+88+skip:]))
+	s.BMax[2] = math.Float32frombits(little.Uint32(src[off+92+skip:]))
+	s.BvQuantFactor = math.Float32frombits(little.Uint32(src[off+96+skip:]))
 }
