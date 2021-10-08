@@ -99,11 +99,17 @@ func Decode(r io.Reader) (*NavMesh, error) {
 			err     error
 			tileSize int64		// UE4: In UE4, this takes 8 bytes (although looks to only be a 32 bit int)
 		)
-		err = binary.Read(r, binary.LittleEndian, &tileHdr)
+
+		err = binary.Read(r, binary.LittleEndian, &tileHdr.TileRef)
 		if err != nil {
 			return nil, err
 		}
-		tileHdr.DataSize = int32(tileSize)		// Convert it to 4.
+
+		err = binary.Read(r, binary.LittleEndian, &tileSize)
+		if err != nil {
+			return nil, err
+		}
+		tileHdr.DataSize = int32(tileSize) 		// UE4: Convert it to 4 bytes
 
 		if tileHdr.TileRef == 0 || tileHdr.DataSize == 0 {
 			break
