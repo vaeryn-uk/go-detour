@@ -3,6 +3,15 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/arl/go-detour)](https://goreportcard.com/report/github.com/arl/go-detour)
 [![codecov](https://codecov.io/gh/arl/go-detour/branch/main/graph/badge.svg)](https://codecov.io/gh/arl/go-detour)
 
+**A fork of the great work done in github.com/arl/go-detour**
+
+This fork hacks at the library to support `.bin` meshes exported from Unreal Engine 
+4.26 (via [this](https://github.com/hxhb/ue4-export-nav-data) UE plugin). This enables
+nav meshes to be built in UE then exported to a server application. This is for 
+prototyping only. These hacks may be made more sustainable if prototyping goes well.
+
+**WARNING:** These hacks are not safe. The changes here undoubtedly break core
+functionality. Do not use this.
 
 # go-detour - port of [recast/detour](https://github.com/recastnavigation/recastnavigation) in Go
 
