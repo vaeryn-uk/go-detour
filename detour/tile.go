@@ -136,7 +136,8 @@ func (s *MeshTile) unserialize(hdr *MeshHeader, src []byte) {
 	for i := range s.Links {
 		l := &s.Links[i]
 
-		l.Ref = PolyRef(little.Uint32(src[off:]))
+		l.Ref = PolyRef(little.Uint64(src[off:]))
+		off += 4	// UE4: poly ref is 64b, so read offset an extra 4 bytes (previously expecting a 32b int).
 		l.Next = little.Uint32(src[off+4:])
 
 		l.Edge = src[off+8]
