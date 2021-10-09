@@ -131,6 +131,54 @@ func Decode(r io.Reader) (*NavMesh, error) {
 	return &mesh, nil
 }
 
+// Bounds returns the min and max XYZ of the tiles in the mesh.
+// This scans all tiles' vertices and resolves the min/max for
+// each XYZ independently. A utility method for debugging/import
+// sanity checking.
+func (m *NavMesh) Bounds() (d3.Vec3, d3.Vec3) {
+	if len(m.Tiles) == 0 || len(m.Tiles[0].Verts) < 3 {
+		return d3.Vec3{}, d3.Vec3{}
+	}
+
+	min := d3.Vec3{
+		m.Tiles[0].Verts[0],
+		m.Tiles[0].Verts[1],
+		m.Tiles[0].Verts[2],
+	}
+
+	max := d3.Vec3{
+		m.Tiles[0].Verts[0],
+		m.Tiles[0].Verts[1],
+		m.Tiles[0].Verts[2],
+	}
+
+	for _, t := range m.Tiles {
+		for i := 0; i < len(t.Verts); i += 3 {
+			if t.Verts[i] < min[0] {
+				min[0] = t.Verts[i]
+			}
+			if t.Verts[i+1] < min[1] {
+				min[1] = t.Verts[i+1]
+			}
+			if t.Verts[i+2] < min[2] {
+				min[2] = t.Verts[i+2]
+			}
+
+			if t.Verts[i] > max[0] {
+				max[0] = t.Verts[i]
+			}
+			if t.Verts[i+1] > max[1] {
+				max[1] = t.Verts[i+1]
+			}
+			if t.Verts[i+2] > max[2] {
+				max[2] = t.Verts[i+2]
+			}
+		}
+	}
+
+	return min, max
+}
+
 // SaveToFile saves the navigation mesh as a binary file.
 func (m *NavMesh) SaveToFile(fn string) error {
 	f, err := os.Create(fn)
