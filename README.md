@@ -6,7 +6,7 @@
 **A fork of the great work done in github.com/arl/go-detour**
 
 This fork hacks at the library to support `.bin` meshes exported from Unreal Engine 
-4.26 (via [this](https://github.com/hxhb/ue4-export-nav-data) UE plugin). This enables
+5.21 (via [this](https://github.com/vaeryn-uk/ue4-export-nav-data) UE plugin). This enables
 nav meshes to be built in UE then exported to a server application. This is for 
 prototyping only. These hacks may be made more sustainable if prototyping goes well.
 

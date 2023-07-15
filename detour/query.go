@@ -1246,8 +1246,8 @@ func (q *NavMeshQuery) queryPolygonsInTile(
 		nodeIdx = 0
 		endIdx = tile.Header.BvNodeCount
 
-		tbmin = d3.NewVec3From(tile.Header.BMin[:])
-		tbmax = d3.NewVec3From(tile.Header.BMax[:])
+		tbmin = Vec3From64(tile.Header.BMin)
+		tbmax = Vec3From64(tile.Header.BMax)
 		qfac = tile.Header.BvQuantFactor
 
 		// Calculate quantized box

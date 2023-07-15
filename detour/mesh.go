@@ -49,8 +49,8 @@ import (
 // see NavMeshQuery, CreateNavMeshData, NavMeshCreateParams
 type NavMesh struct {
 	Params                NavMeshParams // Current initialization params. TODO: do not store this info twice.
-	Orig                  d3.Vec3       // Origin of the tile (0,0)
-	TileWidth, TileHeight float32       // Dimensions of each tile.
+	Orig                  [3]float64       // Origin of the tile (0,0)
+	TileWidth, TileHeight float64       // Dimensions of each tile.
 	MaxTiles              int32         // Max number of tiles.
 	TileLUTSize           int32         // Tile hash lookup size (must be pot).
 	TileLUTMask           int32         // Tile hash lookup mask.
@@ -87,9 +87,9 @@ func Decode(r io.Reader) (*NavMesh, error) {
 
 	var mesh NavMesh
 	status := mesh.Init(&hdr.Params)
-	mesh.saltBits = 24	// UE4 hack.
+	mesh.saltBits = 20	// UE5 hack. Not sure what this is, but debugging UE navmesh loading, this is 20.
 	if StatusFailed(status) {
-		return nil, fmt.Errorf("status failed 0x%x", status)
+		return nil, fmt.Errorf("status failed 0x%x (%s)", status, status.Error())
 	}
 
 	// Read tiles.
@@ -98,7 +98,7 @@ func Decode(r io.Reader) (*NavMesh, error) {
 		var (
 			tileHdr navMeshTileHeader
 			err     error
-			tileSize int64		// UE4: In UE4, this takes 8 bytes (although looks to only be a 32 bit int)
+			tileSize int64		// UE5: In UE, this takes 8 bytes (although looks to only be a 32 bit int)
 		)
 
 		err = binary.Read(r, binary.LittleEndian, &tileHdr.TileRef)
@@ -181,6 +181,8 @@ func (m *NavMesh) Bounds() (d3.Vec3, d3.Vec3) {
 }
 
 // SaveToFile saves the navigation mesh as a binary file.
+//
+// UE5: Changes to internal structure data structures means this does not work.
 func (m *NavMesh) SaveToFile(fn string) error {
 	f, err := os.Create(fn)
 	if err != nil {
@@ -240,7 +242,7 @@ func (m *NavMesh) SaveToFile(fn string) error {
 //  see CreateNavMeshData
 func (m *NavMesh) InitForSingleTile(data []uint8, flags int) Status {
 	var header MeshHeader
-	header.unserialize(data)
+	header.unserialize(data, m.Params)
 
 	// Make sure the data is in right format.
 	if header.Magic != navMeshMagic {
@@ -274,7 +276,7 @@ func (m *NavMesh) InitForSingleTile(data []uint8, flags int) Status {
 // Return the status flags for the operation.
 func (m *NavMesh) Init(params *NavMeshParams) Status {
 	m.Params = *params
-	m.Orig = d3.NewVec3From(params.Orig[0:3])
+	m.Orig = params.Orig
 	m.TileWidth = params.TileWidth
 	m.TileHeight = params.TileHeight
 
@@ -339,7 +341,7 @@ func (m *NavMesh) Init(params *NavMeshParams) Status {
 // see CreateNavMeshData, removeTileBvTree
 func (m *NavMesh) AddTile(data []byte, lastRef TileRef) (Status, TileRef) {
 	var hdr MeshHeader
-	hdr.unserialize(data)
+	hdr.unserialize(data, m.Params)
 
 	// Make sure the data is in right format.
 	if hdr.Magic != navMeshMagic {
@@ -691,7 +693,7 @@ func (m *NavMesh) encodePolyID(salt, it, ip uint32) PolyRef {
 }
 
 // PolyRef is a polygon reference.
-// UE4: this is 8 bytes.
+// UE5: this is 8 bytes.
 type PolyRef uint64
 
 // Link defines a Link between polygons.
@@ -924,6 +926,10 @@ func (m *NavMesh) FindNearestPolyInTile(tile *MeshTile, center, extents, nearest
 	return nearest
 }
 
+func Vec3From64(f [3]float64) d3.Vec3 {
+	return d3.NewVec3XYZ(float32(f[0]), float32(f[1]), float32(f[2]))
+}
+
 // QueryPolygonsInTile queries polygons within a tile.
 func (m *NavMesh) queryPolygonsInTile(
 	tile *MeshTile,
@@ -942,8 +948,8 @@ func (m *NavMesh) queryPolygonsInTile(
 		nodeIdx = 0
 		endIdx = tile.Header.BvNodeCount
 
-		tbmin = d3.NewVec3From(tile.Header.BMin[:])
-		tbmax = d3.NewVec3From(tile.Header.BMax[:])
+		tbmin = Vec3From64(tile.Header.BMin)
+		tbmax = Vec3From64(tile.Header.BMax)
 		qfac = tile.Header.BvQuantFactor
 
 		// Calculate quantized box
@@ -1673,7 +1679,7 @@ func (m *NavMesh) TileAndPolyByRef(ref PolyRef, tile **MeshTile, poly **Poly) St
 //   [out]tx   The tile's x-location. (x, y)
 //   [out]ty   The tile's y-location. (x, y)
 func (m *NavMesh) CalcTileLoc(pos d3.Vec3) (tx, ty int32) {
-	tx = int32(math32.Floor((pos[0] - m.Orig[0]) / m.TileWidth))
-	ty = int32(math32.Floor((pos[2] - m.Orig[2]) / m.TileHeight))
+	tx = int32(math32.Floor((pos[0] - float32(m.Orig[0])) / float32(m.TileWidth)))
+	ty = int32(math32.Floor((pos[2] - float32(m.Orig[2])) / float32(m.TileHeight)))
 	return tx, ty
 }

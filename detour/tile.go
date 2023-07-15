@@ -108,8 +108,8 @@ func (s *MeshTile) unserialize(hdr *MeshHeader, src []byte) {
 
 	s.Verts = make([]float32, 3*hdr.VertCount)
 	for i = range s.Verts {
-		s.Verts[i] = math.Float32frombits(little.Uint32(src[off+0:]))
-		off += 4
+		s.Verts[i] = float32(math.Float64frombits(little.Uint64(src[off+0:])))
+		off += 8
 	}
 	s.Polys = make([]Poly, hdr.PolyCount)
 	for i := range s.Polys {
@@ -151,21 +151,28 @@ func (s *MeshTile) unserialize(hdr *MeshHeader, src []byte) {
 	for i := range s.DetailMeshes {
 		m := &s.DetailMeshes[i]
 
-		m.VertBase = little.Uint32(src[off:])
-		m.TriBase = little.Uint32(src[off+4:])
-		m.VertCount = src[off+8]
-		m.TriCount = src[off+9]
-		off += 12
+		m.VertBase = uint32(little.Uint16(src[off:]))
+		m.TriBase = uint32(little.Uint16(src[off+2:]))
+		m.VertCount = src[off+4]
+		m.TriCount = src[off+5]
+		off += 6
 	}
+
+	// UE5: fix for alignment.
+	off+= (8-(off%8))%8
+
 	s.DetailVerts = make([]float32, 3*hdr.DetailVertCount)
 	for i := range s.DetailVerts {
-		s.DetailVerts[i] = math.Float32frombits(little.Uint32(src[off:]))
-		off += 4
+		s.DetailVerts[i] = float32(math.Float64frombits(little.Uint64(src[off:])))
+		off += 8
 	}
 
 	s.DetailTris = make([]uint8, 4*hdr.DetailTriCount)
 	copy(s.DetailTris, src[off:])
 	off += len(s.DetailTris)
+
+	// UE5: fix for alignment.
+	off+= (8-(off%8))%8
 
 	s.BvTree = make([]BvNode, hdr.BvNodeCount)
 	for i := range s.BvTree {

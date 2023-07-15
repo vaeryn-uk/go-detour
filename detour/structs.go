@@ -10,6 +10,7 @@ type navMeshSetHeader struct {
 	Magic    uint32
 	Version  uint32
 	NumTiles uint32
+	_ uint32 // UE5: navmesh param alignment is 8, so need to pad out 4 bytes here.
 	Params   NavMeshParams
 }
 
@@ -48,9 +49,18 @@ func (s *navMeshSetHeader) WriteTo(w io.Writer) (int64, error) {
 // navigation mesh.
 // see NavMesh.Init()
 type NavMeshParams struct {
-	Orig       [3]float32 // The world space origin of the navigation mesh's tile space. [(x, y, z)]
-	TileWidth  float32    // The width of each tile. (Along the x-axis.)
-	TileHeight float32    // The height of each tile. (Along the z-axis.)
+
+	// UE5 optimizes these fields which in recast exist in the tile data.
+	WalkableHeight float64
+	WalkableRadius float64
+	WalkableClimb float64
+
+	// UE5 stores BV quant values at different resolutions.
+	BvQuants [3]float64
+
+	Orig       [3]float64 // The world space origin of the navigation mesh's tile space. [(x, y, z)]
+	TileWidth  float64    // The width of each tile. (Along the x-axis.)
+	TileHeight float64    // The height of each tile. (Along the z-axis.)
 	MaxTiles   uint32     // The maximum number of tiles the navigation mesh can contain.
 	MaxPolys   uint32     // The maximum number of polygons each tile can contain.
 }
@@ -73,11 +83,11 @@ func (s *NavMeshParams) serialize(dst []byte) {
 	)
 
 	// write each field as little endian
-	little.PutUint32(dst[off:], uint32(math.Float32bits(s.Orig[0])))
-	little.PutUint32(dst[off+4:], uint32(math.Float32bits(s.Orig[1])))
-	little.PutUint32(dst[off+8:], uint32(math.Float32bits(s.Orig[2])))
-	little.PutUint32(dst[off+12:], uint32(math.Float32bits(s.TileWidth)))
-	little.PutUint32(dst[off+16:], uint32(math.Float32bits(s.TileHeight)))
+	little.PutUint32(dst[off:], uint32(math.Float64bits(s.Orig[0])))
+	little.PutUint32(dst[off+4:], uint32(math.Float64bits(s.Orig[1])))
+	little.PutUint32(dst[off+8:], uint32(math.Float64bits(s.Orig[2])))
+	little.PutUint32(dst[off+12:], uint32(math.Float64bits(s.TileWidth)))
+	little.PutUint32(dst[off+16:], uint32(math.Float64bits(s.TileHeight)))
 	little.PutUint32(dst[off+20:], uint32(s.MaxTiles))
 	little.PutUint32(dst[off+24:], uint32(s.MaxPolys))
 }
@@ -102,21 +112,22 @@ type MeshHeader struct {
 	WalkableHeight  float32    // The height of the agents using the tile.
 	WalkableRadius  float32    // The radius of the agents using the tile.
 	WalkableClimb   float32    // The maximum climb height of the agents using the tile.
-	BMin            [3]float32 // The minimum bounds of the tile's AABB. [(x, y, z)]
-	BMax            [3]float32 // The maximum bounds of the tile's AABB. [(x, y, z)]
+	BMin            [3]float64 // The minimum bounds of the tile's AABB. [(x, y, z)]
+	BMax            [3]float64 // The maximum bounds of the tile's AABB. [(x, y, z)]
 	BvQuantFactor   float32    // The bounding volume quantization factor.
 }
 
-// UE4: By default, UE4 stores additional data in each mesh header. These are:
-// int offMeshSegConCount;
-// int offMeshSegPolyBase;
-// int offMeshSegVertBase;
-// int clusterCount;
-// Each is int32, so needs to ignore this many bytes when reading files.
-var skipHeaderBytes = 4 * 4
+// UE5: By default, UE stores additional data in each mesh header. These are:
+// short offMeshSegConCount;
+// short offMeshSegPolyBase;
+// short offMeshSegVertBase;
+// short clusterCount;
+// short resolution;
+// Each is 16b, so needs to ignore this many bytes when reading files.
+const skipTileHeaderBytes = 5 * 2
 
 func (s *MeshHeader) size() int {
-	return 100 + skipHeaderBytes	// UE4: The additional fields increase the size of our header.
+	return 78 + skipTileHeaderBytes // UE5: The changed fields alter the size of our header.
 }
 
 func (s *MeshHeader) serialize(dst []byte) {
@@ -147,16 +158,16 @@ func (s *MeshHeader) serialize(dst []byte) {
 	little.PutUint32(dst[off+60:], uint32(math.Float32bits(s.WalkableHeight)))
 	little.PutUint32(dst[off+64:], uint32(math.Float32bits(s.WalkableRadius)))
 	little.PutUint32(dst[off+68:], uint32(math.Float32bits(s.WalkableClimb)))
-	little.PutUint32(dst[off+72:], uint32(math.Float32bits(s.BMin[0])))
-	little.PutUint32(dst[off+76:], uint32(math.Float32bits(s.BMin[1])))
-	little.PutUint32(dst[off+80:], uint32(math.Float32bits(s.BMin[2])))
-	little.PutUint32(dst[off+84:], uint32(math.Float32bits(s.BMax[0])))
-	little.PutUint32(dst[off+88:], uint32(math.Float32bits(s.BMax[1])))
-	little.PutUint32(dst[off+92:], uint32(math.Float32bits(s.BMax[2])))
+	little.PutUint32(dst[off+72:], uint32(math.Float64bits(s.BMin[0])))
+	little.PutUint32(dst[off+76:], uint32(math.Float64bits(s.BMin[1])))
+	little.PutUint32(dst[off+80:], uint32(math.Float64bits(s.BMin[2])))
+	little.PutUint32(dst[off+84:], uint32(math.Float64bits(s.BMax[0])))
+	little.PutUint32(dst[off+88:], uint32(math.Float64bits(s.BMax[1])))
+	little.PutUint32(dst[off+92:], uint32(math.Float64bits(s.BMax[2])))
 	little.PutUint32(dst[off+96:], uint32(math.Float32bits(s.BvQuantFactor)))
 }
 
-func (s *MeshHeader) unserialize(src []byte) {
+func (s *MeshHeader) unserialize(src []byte, params NavMeshParams) {
 	if len(src) < s.size() {
 		panic("undersized buffer for MeshHeader")
 	}
@@ -165,34 +176,37 @@ func (s *MeshHeader) unserialize(src []byte) {
 		off    int
 	)
 
-	// write each field as little endian
-	s.Magic = int32(little.Uint32(src[off:]))
-	s.Version = int32(little.Uint32(src[off+4:]))
+	// UE5: Rewritten this to match UE's output, which is significantly different.
+	// https://github.com/EpicGames/UnrealEngine/commit/ac8a041d98f18c160569777144eba6e98228b8bf#diff-9045070659cb5abfbc28597fd7baa86f150362060571ecb25351275d9568f22a
+	// Introduces a memory optimization that saves repeating shared data for every tile; instead
+	// they only exist in the navmesh params, which we now accept in to this function
+	// and apply to every tile.
+	s.WalkableHeight = float32(params.WalkableHeight)
+	s.WalkableClimb = float32(params.WalkableClimb)
+	s.WalkableRadius = float32(params.WalkableHeight)
+	s.BvQuantFactor = float32(params.BvQuants[0])
+	s.Magic = navMeshMagic // TODO: Hardcoding this feels wrong, but it's not given to us by UE.
+
+	s.Version = int32(little.Uint16(src[off:]))
+	s.Layer = int32(little.Uint16(src[off+2:]))
+	s.PolyCount = int32(little.Uint16(src[off+4:]))
+	s.VertCount = int32(little.Uint16(src[off+6:]))
 	s.X = int32(little.Uint32(src[off+8:]))
 	s.Y = int32(little.Uint32(src[off+12:]))
-	s.Layer = int32(little.Uint32(src[off+16:]))
-	s.UserID = little.Uint32(src[off+20:])
-	s.PolyCount = int32(little.Uint32(src[off+24:]))
-	s.VertCount = int32(little.Uint32(src[off+28:]))
-	s.MaxLinkCount = int32(little.Uint32(src[off+32:]))
-	s.DetailMeshCount = int32(little.Uint32(src[off+36:]))
-	s.DetailVertCount = int32(little.Uint32(src[off+40:]))
-	s.DetailTriCount = int32(little.Uint32(src[off+44:]))
-	s.BvNodeCount = int32(little.Uint32(src[off+48:]))
-	s.OffMeshConCount = int32(little.Uint32(src[off+52:]))
-	s.OffMeshBase = int32(little.Uint32(src[off+56:]))
+	s.MaxLinkCount = int32(little.Uint16(src[off+16:]))
+	s.DetailMeshCount = int32(little.Uint16(src[off+18:]))
+	s.DetailVertCount = int32(little.Uint16(src[off+20:]))
+	s.DetailTriCount = int32(little.Uint16(src[off+22:]))
+	s.BvNodeCount = int32(little.Uint16(src[off+24:]))
+	s.OffMeshConCount = int32(little.Uint16(src[off+26:]))
+	s.OffMeshBase = int32(little.Uint16(src[off+28:]))
 
-	// UE4: this is where the additional mesh headers appear. Start skipping now.
-	skip := skipHeaderBytes
+	// UE5: this is where the additional mesh headers appear. Start skipping now.
 
-	s.WalkableHeight = math.Float32frombits(little.Uint32(src[off+60+skip:]))
-	s.WalkableRadius = math.Float32frombits(little.Uint32(src[off+64+skip:]))
-	s.WalkableClimb = math.Float32frombits(little.Uint32(src[off+68+skip:]))
-	s.BMin[0] = math.Float32frombits(little.Uint32(src[off+72+skip:]))
-	s.BMin[1] = math.Float32frombits(little.Uint32(src[off+76+skip:]))
-	s.BMin[2] = math.Float32frombits(little.Uint32(src[off+80+skip:]))
-	s.BMax[0] = math.Float32frombits(little.Uint32(src[off+84+skip:]))
-	s.BMax[1] = math.Float32frombits(little.Uint32(src[off+88+skip:]))
-	s.BMax[2] = math.Float32frombits(little.Uint32(src[off+92+skip:]))
-	s.BvQuantFactor = math.Float32frombits(little.Uint32(src[off+96+skip:]))
+	s.BMin[0] = math.Float64frombits(little.Uint64(src[off+30+skipTileHeaderBytes:]))
+	s.BMin[1] = math.Float64frombits(little.Uint64(src[off+38+skipTileHeaderBytes:]))
+	s.BMin[2] = math.Float64frombits(little.Uint64(src[off+46+skipTileHeaderBytes:]))
+	s.BMax[0] = math.Float64frombits(little.Uint64(src[off+54+skipTileHeaderBytes:]))
+	s.BMax[1] = math.Float64frombits(little.Uint64(src[off+62+skipTileHeaderBytes:]))
+	s.BMax[2] = math.Float64frombits(little.Uint64(src[off+70+skipTileHeaderBytes:]))
 }

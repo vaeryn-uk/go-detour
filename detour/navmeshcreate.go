@@ -732,8 +732,12 @@ func CreateNavMeshData(params *NavMeshCreateParams) ([]uint8, error) {
 	hdr.PolyCount = int32(totPolyCount)
 	hdr.VertCount = int32(totVertCount)
 	hdr.MaxLinkCount = maxLinkCount
-	copy(hdr.BMin[:], params.BMin[:])
-	copy(hdr.BMax[:], params.BMax[:])
+	hdr.BMin[0] = float64(params.BMin[0])
+	hdr.BMin[1] = float64(params.BMin[1])
+	hdr.BMin[2] = float64(params.BMin[2])
+	hdr.BMax[0] = float64(params.BMax[0])
+	hdr.BMax[1] = float64(params.BMax[1])
+	hdr.BMax[2] = float64(params.BMax[2])
 	hdr.DetailMeshCount = params.PolyCount
 	hdr.DetailVertCount = uniqueDetailVertCount
 	hdr.DetailTriCount = detailTriCount
